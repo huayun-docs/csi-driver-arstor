@@ -1,0 +1,51 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: topology-arstor-standard
+provisioner: arstor.csi.huayun.io
+volumeBindingMode: WaitForFirstConsumer
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.arstor.csi/node
+    values:
+    - "ceph6913"
+  - key: topology.arstor.csi/arstorenabled
+    values:
+    - "true"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: topology-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: topology-arstor-standard
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-topology
+  namespace: default
+spec:
+  dnsPolicy: ClusterFirst
+  containers:
+  - name: busybox
+    image: busybox:1.28.4
+    command: ["sh","-c","echo 'Hello world! -- topology' >> /mnt/test/hello; ls -l /mnt/test/hello; cat /mnt/test/hello;  tail -f /dev/null "]
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /mnt/test
+        name: csi-data-arstorplugin
+  restartPolicy: Always
+  volumes:
+  - name: csi-data-arstorplugin
+    persistentVolumeClaim:
+      claimName: topology-pvc
+      readOnly: false

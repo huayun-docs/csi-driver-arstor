@@ -1,0 +1,53 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-sc-arstorplugin
+provisioner: arstor.csi.huayun.io
+parameters:
+  fsType: xfs
+
+
+---
+
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshotClass
+metadata:
+  name: csi-arstor-snapclass
+snapshotter: arstor.csi.huayun.io
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-snapshot-demo
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: csi-sc-arstorplugin
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+  namespace: default
+spec:
+  dnsPolicy: ClusterFirst
+  containers:
+  - name: busybox
+    image: busybox:1.28.4
+    command: ["sh","-c","echo 'Hello world! -- snapshot' >> /mnt/test/hello; ls -l /mnt/test/hello; cat /mnt/test/hello; tail -f /dev/null "]
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /mnt/test
+        name: pvc-snapshot-demo
+  restartPolicy: Always
+  volumes:
+  - name: pvc-snapshot-demo
+    persistentVolumeClaim:
+      claimName: pvc-snapshot-demo
+      readOnly: false

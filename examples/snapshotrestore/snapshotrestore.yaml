@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snapshot-demo-restore
+spec:
+  storageClassName: csi-sc-arstorplugin
+  dataSource:
+    name: new-snapshot-demo 
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-restore
+  namespace: default
+spec:
+  dnsPolicy: ClusterFirst
+  containers:
+  - name: busybox
+    image: busybox:1.28.4
+    command: ["sh","-c","echo 'Hello world! -- restore' >> /mnt/test/hello; ls -l /mnt/test/hello; cat /mnt/test/hello; tail -f /dev/null "]
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /mnt/test
+        name: snapshot-demo-restore
+  restartPolicy: Always
+  volumes:
+  - name: snapshot-demo-restore
+    persistentVolumeClaim:
+      claimName: snapshot-demo-restore
+      readOnly: false

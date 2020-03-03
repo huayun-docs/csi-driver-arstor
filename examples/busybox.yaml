@@ -1,0 +1,47 @@
+# This YAML file contains busybox & csi arstor driver objects,
+# which are necessary to run busybox with csi arstor driver.
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-sc-arstorplugin
+provisioner: arstor.csi.huayun.io
+parameters:
+  fsType: xfs
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-pvc-arstorplugin
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: csi-sc-arstorplugin
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+  namespace: default
+spec:
+  dnsPolicy: ClusterFirst
+  containers:
+  - name: busybox
+    image: busybox:1.28.4
+    command: ["sh","-c","echo 'Hello world!' >> /mnt/test/hello; ls -l /mnt/test/hello; cat /mnt/test/hello;  tail -f /dev/null "]
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /mnt/test
+        name: csi-data-arstorplugin
+  restartPolicy: Always
+  volumes:
+  - name: csi-data-arstorplugin
+    persistentVolumeClaim:
+      claimName: csi-pvc-arstorplugin
+      readOnly: false

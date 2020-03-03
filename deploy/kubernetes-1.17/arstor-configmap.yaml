@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  arstorMountPoint: "/arstor"
+  arstorShares: "10.10.20.31:/hyperconverged"
+  arstorContainer: "mxsp"
+kind: ConfigMap
+metadata:
+  labels:
+    app: arstor-configmap
+  name: arstor-configmap
+  namespace: kube-system

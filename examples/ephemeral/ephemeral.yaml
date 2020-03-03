@@ -1,0 +1,20 @@
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-ephemeral
+  namespace: default
+spec:
+  dnsPolicy: ClusterFirst
+  containers:
+  - name: busybox
+    image: busybox:1.28.4
+    command: ["sh","-c","echo 'Hello world! -- ephemeral' >> /mnt/test/hello; ls -l /mnt/test/hello; cat /mnt/test/hello;  tail -f /dev/null "]
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /mnt/test
+        name: my-csi-volume
+  volumes:
+    - name: my-csi-volume
+      csi:
+        driver: arstor.csi.huayun.io

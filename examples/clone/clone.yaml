@@ -1,0 +1,40 @@
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-demo-clone
+spec:
+  storageClassName: csi-sc-arstorplugin
+  dataSource:
+    name: csi-pvc-arstorplugin
+    kind: PersistentVolumeClaim
+    apiGroup: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-clone
+  namespace: default
+spec:
+  dnsPolicy: ClusterFirst
+  containers:
+  - name: busybox
+    image: busybox:1.28.4
+    command: ["sh","-c","echo 'Hello world! -- clone' >> /mnt/test/hello; ls -l /mnt/test/hello; cat /mnt/test/hello; tail -f /dev/null "]
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /mnt/test
+        name: pvc-demo-clone
+  restartPolicy: Always
+  volumes:
+  - name: pvc-demo-clone
+    persistentVolumeClaim:
+      claimName: pvc-demo-clone
+      readOnly: false

@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: CSIDriver
+metadata:
+  name: arstor.csi.huayun.io
+spec:
+  volumeLifecycleModes:
+  - Persistent
+  - Ephemeral
+  attachRequired: false
+  podInfoOnMount: true
