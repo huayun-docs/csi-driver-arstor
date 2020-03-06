@@ -1,4 +1,5 @@
-arstor是一个分布式存储系统，csi-driver-arstor是基于CSI机制为arstor开发的driver，使得kubernetes能通过volume manager使用arstor volume。
+ArStor是一个[华云](https://www.huayun.com/)的分布式存储系统，它是基于[Maxta](https://www.stsginc.com/2017/Maxta%20Technical%20White%20Paper%200417.pdf)打造而成；
+ArStor能提供具有高可靠性, 高性能的存储服务，csi-driver-arstor是基于CSI机制为ArStor开发的driver，使得kubernetes能通过volume manager使用ArStor volume，利用ArStor的存储功能。
 
 ## 使用文档
 
