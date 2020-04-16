@@ -1,0 +1,140 @@
+# This YAML file contains CSI Controller Plugin Sidecars
+# external-attacher, external-provisioner, external-snapshotter
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-arstor-controller-service
+  namespace: kube-system
+  labels:
+    app: csi-arstor-controllerplugin
+spec:
+  selector:
+    app: csi-arstor-controllerplugin
+  ports:
+    - name: dummy
+      port: 12345
+
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-arstor-controllerplugin
+  namespace: kube-system
+spec:
+  serviceName: "csi-arstor-controller-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-arstor-controllerplugin
+  template:
+    metadata:
+      labels:
+        app: csi-arstor-controllerplugin
+    spec:
+      serviceAccount: csi-arstor-controller-sa
+      containers:
+        - name: csi-attacher
+          image: quay.io/k8scsi/csi-attacher:v2.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-provisioner
+          image: quay.io/k8scsi/csi-provisioner:v1.6.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-snapshotter
+          image: quay.io/k8scsi/csi-snapshotter:v2.1.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - name: csi-resizer
+          image: quay.io/k8scsi/csi-resizer:v0.5.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: arstor-csi-plugin
+          image: docker.io/fengyunpan/arstorplugin:v1.0.0
+          args :
+            - "--v=5"
+            - "--nodeid=$(NODE_ID)"
+            - "--drivername=$(DRIVER_NAME)"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--ephemeral=$(EPHEMERAL)"
+            - "--arstorMountPoint=$(ARSTOR_MOUNT_POINT)"
+            - "--arstorShares=$(ARSTOR_SHARES)"
+            - "--arstorContainer=$(ARSTOR_CONTAINER)"
+            - "--dockerUrl=$(DOCKER_URL)"
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: DRIVER_NAME
+              value: arstor.csi.huayun.io
+            - name: EPHEMERAL
+              value: "false"
+            - name: ARSTOR_MOUNT_POINT
+              valueFrom:
+                configMapKeyRef:
+                  name: arstor-configmap
+                  key: arstorMountPoint
+            - name: ARSTOR_SHARES
+              valueFrom:
+                configMapKeyRef:
+                  name: arstor-configmap
+                  key: arstorShares
+            - name: ARSTOR_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: arstor-configmap
+                  key: arstorContainer
+            - name: DOCKER_URL
+              value: unix:///var/run/docker.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: arstor-dir
+              mountPath: /arstor
+            - name: socket-dir
+              mountPath: /csi
+            - name: dockersock
+              mountPath: "/var/run/docker.sock"
+      volumes:
+        - name: arstor-dir
+          hostPath:
+            path: /arstor
+        - name: socket-dir
+          emptyDir:
+        - name: dockersock
+          hostPath:
+            path: /var/run/docker.sock

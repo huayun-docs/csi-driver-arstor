@@ -1,0 +1,140 @@
+# This YAML file contains driver-registrar & csi driver nodeplugin API objects,
+# which are necessary to run csi nodeplugin for arstor.
+
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-arstor-nodeplugin
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-arstor-nodeplugin
+  template:
+    metadata:
+      labels:
+        app: csi-arstor-nodeplugin
+    spec:
+      serviceAccount: csi-arstor-node-sa
+      hostNetwork: true
+      containers:
+        - name: node-driver-registrar
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.3.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/arstor.csi.huayun.io /registration/arstor.csi.huayun.io-reg.sock"]
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/arstor.csi.huayun.io/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: liveness-probe
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+          image: quay.io/k8scsi/livenessprobe:v1.1.0
+          args:
+            - --csi-address=/csi/csi.sock
+            - --connection-timeout=3s
+            - --health-port=9898
+        - name: arstor-csi-plugin
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: docker.io/fengyunpan/arstorplugin:v1.0.0
+          args :
+            - "--v=5"
+            - "--nodeid=$(NODE_ID)"
+            - "--drivername=$(DRIVER_NAME)"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--ephemeral=$(EPHEMERAL)"
+            - "--arstorMountPoint=$(ARSTOR_MOUNT_POINT)"
+            - "--arstorShares=$(ARSTOR_SHARES)"
+            - "--arstorContainer=$(ARSTOR_CONTAINER)"
+            - "--dockerUrl=$(DOCKER_URL)"
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: CSI_ENDPOINT
+              value: unix://csi/csi.sock
+            - name: DRIVER_NAME
+              value: arstor.csi.huayun.io
+            - name: EPHEMERAL
+              value: "false"
+            - name: ARSTOR_MOUNT_POINT
+              valueFrom:
+                configMapKeyRef:
+                  name: arstor-configmap
+                  key: arstorMountPoint
+            - name: ARSTOR_SHARES
+              valueFrom:
+                configMapKeyRef:
+                  name: arstor-configmap
+                  key: arstorShares
+            - name: ARSTOR_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: arstor-configmap
+                  key: arstorContainer
+            - name: DOCKER_URL
+              value: unix:///var/run/docker.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: "Bidirectional"
+            - name: arstor-dir
+              mountPath: /arstor
+              mountPropagation: "HostToContainer"
+            - name: dockersock
+              mountPath: "/var/run/docker.sock"
+            - name: dev-dir
+              mountPath: /dev
+              mountPropagation: "HostToContainer"
+      volumes:
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/arstor.csi.huayun.io
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: arstor-dir
+          hostPath:
+            path: /arstor
+            type: Directory
+        - name: dockersock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: dev-dir
+          hostPath:
+            path: /dev
+            type: Directory
